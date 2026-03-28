@@ -281,6 +281,8 @@ function verifyUserPayment(response, name, email) {
 // --- Change: Admin Email Define Karein ---
 const ADMIN_EMAIL = "knowledgemistry@gmail.com"; // Yaha apni main ID likhein
 
+const ADMIN_EMAIL = "apni-admin-id@gmail.com"; // <-- Apni Gmail id yaha dalein
+
 function loginUser() {
   const emailInput = document.getElementById("loginEmail");
   const email = emailInput.value.trim().toLowerCase();
@@ -291,21 +293,21 @@ function loginUser() {
     return;
   }
 
-  // --- Change: Admin Login Check ---
+  // --- NAYA: Admin Identification ---
   if (email === ADMIN_EMAIL) {
     currentUserEmail = email;
     showLoginMessage("Admin Access Granted!", "success");
     document.getElementById("loginNavBtn").classList.add("hidden");
     document.getElementById("logoutNavBtn").classList.remove("hidden");
-    
+
     setTimeout(() => {
-      loadAdminData(); // Admin data fetch karne ka function
       showPage("admin-dashboard");
+      fetchAdminData(); // Stats load karne ke liye
     }, 1000);
     return;
   }
 
-  // Normal User Login Logic (Existing)
+  // --- Purana Buyer Login Logic ---
   btn.disabled = true;
   btn.innerText = "Verifying Access...";
   callBackend("checkAccess", { email: email }).then(res => {
@@ -322,12 +324,35 @@ function loginUser() {
   });
 }
 
-// Admin Dashboard Data Fetch (Dummy logic for UI)
-function loadAdminData() {
-  // Yaha aap backend se real stats mangwa sakte hain
-  // Filhal UI update karne ke liye:
-  document.getElementById("totalEarnings").innerText = "₹1,18,500";
-  document.getElementById("totalOrders").innerText = "1,500";
+// --- NAYA: Admin Data Fetch Function (Scripts ke niche add karein) ---
+async function fetchAdminData() {
+  const container = document.getElementById("admin-orders-list");
+  try {
+    const res = await callBackend("getAdminStats");
+    
+    document.getElementById("admTodayEarnings").innerText = res.todayEarnings;
+    document.getElementById("admTodayOrders").innerText = res.todayOrders;
+    document.getElementById("admWeekEarnings").innerText = res.weekEarnings;
+    document.getElementById("admTotalEarnings").innerText = res.totalEarnings;
+    document.getElementById("admTotalOrdersCount").innerText = res.totalOrdersCount;
+
+    if (res.ordersHistory && res.ordersHistory.length > 0) {
+      container.innerHTML = res.ordersHistory.map(order => `
+        <div class="order-item-card">
+          <div class="order-info">
+            <p style="font-weight:600; margin:0;">${order.name}</p>
+            <p style="font-size:12px; color:#9ca3af; margin:0;">${order.email}</p>
+          </div>
+          <div style="text-align:right">
+            <p style="font-size:12px; margin:0;">${order.date}</p>
+            <span style="background:rgba(34,197,94,0.1); color:#22c55e; padding:2px 8px; border-radius:10px; font-size:11px;">Success</span>
+          </div>
+        </div>
+      `).join('');
+    }
+  } catch (err) {
+    container.innerHTML = "<p style='color:red;'>Error loading stats.</p>";
+  }
 }
 
 // Helper to show message in the card (exactly like payment card)
