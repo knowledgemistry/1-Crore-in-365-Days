@@ -278,51 +278,56 @@ function verifyUserPayment(response, name, email) {
     });
 }
 
+// --- Change: Admin Email Define Karein ---
+const ADMIN_EMAIL = "knowledgemistry@gmail.com"; // Yaha apni main ID likhein
+
 function loginUser() {
   const emailInput = document.getElementById("loginEmail");
-  const email = emailInput.value.trim();
+  const email = emailInput.value.trim().toLowerCase();
   const btn = document.querySelector(".login-btn");
 
   if (!email) {
-    showLoginMessage("Please enter your email address", "error");
+    showLoginMessage("Please enter email", "error");
     return;
   }
 
-  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailPattern.test(email)) {
-    showLoginMessage("Invalid email format", "error");
+  // --- Change: Admin Login Check ---
+  if (email === ADMIN_EMAIL) {
+    currentUserEmail = email;
+    showLoginMessage("Admin Access Granted!", "success");
+    document.getElementById("loginNavBtn").classList.add("hidden");
+    document.getElementById("logoutNavBtn").classList.remove("hidden");
+    
+    setTimeout(() => {
+      loadAdminData(); // Admin data fetch karne ka function
+      showPage("admin-dashboard");
+    }, 1000);
     return;
   }
 
+  // Normal User Login Logic (Existing)
   btn.disabled = true;
   btn.innerText = "Verifying Access...";
-  showLoginMessage("Checking our records, please wait...", "success");
-
-  // Backend check call
   callBackend("checkAccess", { email: email }).then(res => {
     btn.disabled = false;
     btn.innerText = "Access My Ebook";
-    
     if (res && res.hasAccess === true) {
-      // --- FIX START: Global variable mein email save kiya ---
-      currentUserEmail = email; 
-      // --- FIX END ---
-
-      showLoginMessage("Access Granted! Opening Dashboard...", "success");
-      
-      // Header Buttons Switch
+      currentUserEmail = email;
+      showPage("dashboard-page");
       document.getElementById("loginNavBtn").classList.add("hidden");
       document.getElementById("logoutNavBtn").classList.remove("hidden");
-      
-      showPage("dashboard-page"); 
     } else {
-      showLoginMessage("No purchase found for this email ❌", "error");
+      showLoginMessage("No purchase found!", "error");
     }
-  }).catch(err => {
-    btn.disabled = false;
-    btn.innerText = "Access My Ebook";
-    showLoginMessage("Server Error. Please refresh and try again.", "error");
   });
+}
+
+// Admin Dashboard Data Fetch (Dummy logic for UI)
+function loadAdminData() {
+  // Yaha aap backend se real stats mangwa sakte hain
+  // Filhal UI update karne ke liye:
+  document.getElementById("totalEarnings").innerText = "₹1,18,500";
+  document.getElementById("totalOrders").innerText = "1,500";
 }
 
 // Helper to show message in the card (exactly like payment card)
