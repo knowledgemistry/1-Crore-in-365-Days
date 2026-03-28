@@ -602,53 +602,44 @@
 <div class="gold-divider"></div>
 
 
-<section id="admin-dashboard" class="page">
+<section id="admin-dashboard" class="page hidden">
   <div class="container">
     
-    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 30px;">
-      <div class="logo" style="font-size: 24px;">KM</div>
+    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 30px; margin-top: 20px;">
+      <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #d59e15, #f5c52b); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #000; font-size: 20px;">KM</div>
       <div>
-        <h2 style="font-size: 20px;">Knowledge Mistry</h2>
-        <p style="font-size: 12px; color: var(--text-muted);">Admin Control Center</p>
+        <h2 style="font-size: 22px; color: white; margin: 0;">Knowledge Mistry</h2>
+        <p style="font-size: 12px; color: #9ca3af; margin: 0;">Admin Control Panel</p>
       </div>
     </div>
 
     <div class="admin-stats-grid">
       <div class="stat-card">
-        <p>Today Earnings</p>
-        <h3>₹790</h3>
-        <span class="sub-text">10 Orders</span>
+        <p>Today Earnings & Orders</p>
+        <h3 id="admTodayEarnings">₹0</h3>
+        <span class="sub-text" id="admTodayOrders">0 Orders</span>
       </div>
       <div class="stat-card">
-        <p>This Week</p>
-        <h3>₹5,530</h3>
-        <span class="sub-text">70 Orders</span>
+        <p>This Week Earnings & Orders</p>
+        <h3 id="admWeekEarnings">₹0</h3>
+        <span class="sub-text">Past 7 Days</span>
       </div>
       <div class="stat-card">
-        <p>Total Earnings</p>
-        <h3>₹1,18,500</h3>
-        <span class="sub-text">1,500 Orders</span>
+        <p>Total Earnings & Orders</p>
+        <h3 id="admTotalEarnings">₹0</h3>
+        <span class="sub-text" id="admTotalOrdersCount">0 Orders</span>
       </div>
       <div class="stat-card">
-        <p>Performance</p>
-        <h3>+12.5%</h3>
+        <p>Performance Rate</p>
+        <h3 id="performanceRate">+100%</h3>
         <span class="sub-text">From last month</span>
       </div>
     </div>
 
-    <h2 style="margin: 40px 0 20px;">Recent Orders</h2>
-    <div id="orders-list">
-      <div class="order-item-card">
-        <div class="order-info">
-          <p class="buyer-name">Rahul Patel</p>
-          <p class="buyer-email">rahul@example.com</p>
-        </div>
-        <div class="order-meta">
-          <p class="order-date">28 March, 2026</p>
-          <span class="status-badge">Success</span>
-        </div>
-      </div>
-      </div>
+    <h2 style="margin: 40px 0 20px; font-size: 20px; color: white;">Orders History</h2>
+    <div id="admin-orders-list">
+      <p style="color: #9ca3af; text-align: center;">Fetching data...</p>
+    </div>
 
   </div>
 </section>
