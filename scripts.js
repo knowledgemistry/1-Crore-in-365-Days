@@ -1,0 +1,516 @@
+let expanded = false;
+let currentUserEmail = "";
+
+const BACKEND_URL = "https://script.google.com/macros/s/AKfycbxSQ91yiZLkAh4miJTLm-IqesvgKk4AcrF0snmtfRI8c2h00tEj-VZFPF6AX4zlDp81DQ/exec";
+
+async function callBackend(action, params = {}) {
+  // URL mein parameters add karna (GET request ke liye)
+  let url = new URL(BACKEND_URL);
+  url.searchParams.append("action", action);
+  
+  for (let key in params) {
+    url.searchParams.append(key, params[key]);
+  }
+
+  try {
+    const response = await fetch(url);
+    return await response.json();
+  } catch (e) {
+    console.error("CORS or Fetch Error:", e);
+    return { error: true };
+  }
+}
+
+function toggleChapters() {
+  const items = document.querySelectorAll('.chapter-item');
+  const btn = document.querySelector('.view-all');
+
+  expanded = !expanded;
+
+  items.forEach((item, index) => {
+    if (index >= 5) {
+
+      if (expanded) {
+        // SHOW
+        item.classList.remove('hidden');
+        setTimeout(() => {
+          item.classList.remove('fade-out');
+          item.classList.add('show');
+        }, 10);
+
+      } else {
+        // HIDE WITH ANIMATION
+        item.classList.remove('show');
+        item.classList.add('fade-out');
+
+        setTimeout(() => {
+          item.classList.add('hidden');
+        }, 300); // match CSS timing
+      }
+
+    }
+  });
+
+  btn.innerText = expanded 
+    ? "છુપાવો" 
+    : "બધા 35 ચેપ્ટર્સ જુઓ";
+}
+
+/* INITIAL */
+document.addEventListener("DOMContentLoaded", () => {
+  const items = document.querySelectorAll('.chapter-item');
+
+  items.forEach((item, index) => {
+    if (index >= 5) {
+      item.classList.add('hidden');
+    }
+  });
+});
+
+function openCheckout() {
+  const landing = document.getElementById("landing-page");
+  const checkout = document.getElementById("checkout-page");
+
+  // 1. Sabhi pages se active class hatao aur hidden add karo
+  document.querySelectorAll(".page").forEach(p => {
+    p.classList.remove("active", "fade-up");
+    p.classList.add("hidden");
+  });
+
+  // 2. Checkout page ko setup karo
+  checkout.classList.remove("hidden");
+  checkout.classList.add("active");
+
+  // 3. Animation restart karne ke liye trick
+  void checkout.offsetWidth; 
+  checkout.classList.add("fade-up");
+
+  updateStickyCTA();
+  window.scrollTo(0, 0);
+}
+
+function closeCheckout() {
+  const landing = document.getElementById("landing-page");
+
+  document.querySelectorAll(".page").forEach(p => {
+    p.classList.remove("active", "fade-up");
+    p.classList.add("hidden");
+  });
+
+  landing.classList.remove("hidden");
+  landing.classList.add("active");
+
+  void landing.offsetWidth;
+  landing.classList.add("fade-up");
+
+  updateStickyCTA();
+  window.scrollTo(0, 0);
+}
+
+// closeLogin mein bhi same yahi closeCheckout wala logic call kar sakte hain 
+// ya dono ko ek hi common function "showLanding()" bana kar de sakte hain.
+function closeLogin() {
+  closeCheckout(); 
+}
+
+function showMessage(text, type) {
+  const box = document.getElementById("formMessage");
+  box.innerText = text;
+  box.className = "form-message " + type;
+  box.style.display = "block";
+}
+
+function clearMessage() {
+  const box = document.getElementById("formMessage");
+  box.style.display = "none";
+}
+
+function startPayment() {
+  const name = document.querySelector('input[type="text"]').value.trim();
+  const email = document.querySelector('input[type="email"]').value.trim();
+
+  clearMessage();
+
+  // 1. EMPTY CHECK
+  if (!name || !email) {
+    showMessage("Please enter your full name and email", "error");
+    return;
+  }
+
+  // 2. FORMAT CHECK
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailPattern.test(email)) {
+    showMessage("Invalid email format", "error");
+    return;
+  }
+
+  // 3. TYPO CHECK (smart)
+  const domain = email.split("@")[1];
+  const suggestions = {
+    "gamil.com": "gmail.com",
+    "gmial.com": "gmail.com",
+    "gmal.com": "gmail.com",
+    "yaho.com": "yahoo.com",
+    "outlok.com": "outlook.com"
+  };
+
+  if (suggestions[domain]) {
+    showMessage(`Did you mean ${email.replace(domain, suggestions[domain])}?`, "error");
+    return;
+  }
+
+  // 4. FAKE EMAIL BLOCK
+  const blocked = ["tempmail", "10min", "mailinator", "fake"];
+  if (blocked.some(b => email.includes(b))) {
+    showMessage("Temporary emails are not allowed", "error");
+    return;
+  }
+
+  // 🔥 5. DUPLICATE PURCHASE CHECK
+  showMessage("Checking account status...", "success");
+
+  callBackend("checkAccess", { email: email })
+    .then(res => {
+      if (res && res.hasAccess === true) {
+        // --- FIX START ---
+        currentUserEmail = email; // Email ko global variable mein save kiya
+        // --- FIX END ---
+
+        showMessage("You already have access! Opening your dashboard...", "success");
+        
+        const loginNav = document.getElementById("loginNavBtn");
+        const logoutNav = document.getElementById("logoutNavBtn");
+        if(loginNav) loginNav.classList.add("hidden");
+        if(logoutNav) logoutNav.classList.remove("hidden");
+
+        setTimeout(() => {
+          showPage("dashboard-page");
+        }, 1500);
+      } else {
+        showMessage("Redirecting to secure payment...", "success");
+        openRazorpay(name, email);
+      }
+    })
+    .catch(err => {
+      console.error("Check Access Error:", err);
+      openRazorpay(name, email);
+    });
+}
+
+function openRazorpay(name, email) {
+  if (typeof Razorpay === "undefined") {
+    showMessage("Payment system failed to load. Please refresh.", "error");
+    return;
+  }
+
+  showMessage("Generating Order...", "success");
+
+  // Backend se Key aur Order details mangwana
+  callBackend("getCheckoutDetails").then(data => {
+    var options = {
+      "key": data.rzpKey, // Backend se aayi key
+      "amount": data.amount, // Backend se aaya amount
+      "currency": "INR",
+      "name": "Mission 1 Crore",
+      "description": "365 Days Blueprint Ebook",
+      "order_id": data.order_id, // Backend se aaya order id
+      "prefill": { "name": name, "email": email },
+      "theme": { "color": "#d59e15" },
+      "handler": function (response) {
+        verifyUserPayment(response, name, email);
+      },
+      "modal": {
+        "ondismiss": function() {
+          showMessage("Payment cancelled", "error");
+        }
+      }
+    };
+    var rzp = new Razorpay(options);
+    rzp.open();
+  }).catch(err => {
+    console.error("Checkout Error:", err);
+    showMessage("Failed to start payment. Try again.", "error");
+  });
+}
+
+function verifyUserPayment(response, name, email) {
+  showMessage("Verifying payment...", "success");
+
+  // Hum POST ki jagah GET parameters bhej rahe hain CORS se bachne ke liye
+  const params = {
+    action: "verifyPayment",
+    order_id: response.razorpay_order_id,
+    payment_id: response.razorpay_payment_id,
+    signature: response.razorpay_signature,
+    name: name,
+    email: email
+  };
+
+  // URL query string banana
+  const queryString = Object.keys(params)
+    .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(params[key]))
+    .join('&');
+
+  fetch(`${BACKEND_URL}?${queryString}`)
+    .then(res => res.json())
+    .then(res => {
+      if (res && res.success === true) {
+        // --- FIX START: Global variable mein email save kiya ---
+        currentUserEmail = email; 
+        // --- FIX END ---
+
+        showMessage("Payment verified! Opening your dashboard... 🎉", "success");
+        
+        // Login status update
+        document.getElementById("loginNavBtn").classList.add("hidden");
+        document.getElementById("logoutNavBtn").classList.remove("hidden");
+
+        setTimeout(() => {
+          showPage("dashboard-page");
+        }, 1500);
+      } else {
+        showMessage("Verification failed: " + (res.message || "Unknown error"), "error");
+      }
+    })
+    .catch(err => {
+      console.error("Verification Error:", err);
+      showMessage("Server connection error during verification", "error");
+    });
+}
+
+function loginUser() {
+  const emailInput = document.getElementById("loginEmail");
+  const email = emailInput.value.trim();
+  const btn = document.querySelector(".login-btn");
+
+  if (!email) {
+    showLoginMessage("Please enter your email address", "error");
+    return;
+  }
+
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailPattern.test(email)) {
+    showLoginMessage("Invalid email format", "error");
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerText = "Verifying Access...";
+  showLoginMessage("Checking our records, please wait...", "success");
+
+  // Backend check call
+  callBackend("checkAccess", { email: email }).then(res => {
+    btn.disabled = false;
+    btn.innerText = "Access My Ebook";
+    
+    if (res && res.hasAccess === true) {
+      // --- FIX START: Global variable mein email save kiya ---
+      currentUserEmail = email; 
+      // --- FIX END ---
+
+      showLoginMessage("Access Granted! Opening Dashboard...", "success");
+      
+      // Header Buttons Switch
+      document.getElementById("loginNavBtn").classList.add("hidden");
+      document.getElementById("logoutNavBtn").classList.remove("hidden");
+      
+      showPage("dashboard-page"); 
+    } else {
+      showLoginMessage("No purchase found for this email ❌", "error");
+    }
+  }).catch(err => {
+    btn.disabled = false;
+    btn.innerText = "Access My Ebook";
+    showLoginMessage("Server Error. Please refresh and try again.", "error");
+  });
+}
+
+// Helper to show message in the card (exactly like payment card)
+function showLoginMessage(text, type) {
+  const box = document.getElementById("loginMessage");
+  box.innerText = text;
+  box.className = "form-message " + type;
+  box.style.display = "block";
+}
+
+// Common function to switch pages
+function showPage(pageId) {
+  // 1. Pehle sabhi pages ko hide karo
+  const allPages = document.querySelectorAll(".page");
+  allPages.forEach(p => {
+    p.classList.add("hidden");
+    p.classList.remove("active", "fade-up");
+  });
+
+  // 2. Target page ko dhoondo
+  const target = document.getElementById(pageId);
+  
+  if (target) {
+    target.classList.remove("hidden");
+    target.classList.add("active");
+    
+    // 3. Animation restart (Ye zaroori hai)
+    void target.offsetWidth; 
+    target.classList.add("fade-up");
+    
+    // 4. CTA button handle karein
+    updateStickyCTA();
+    window.scrollTo(0, 0);
+    
+    console.log("Successfully switched to: " + pageId);
+  } else {
+    console.error("Page ID not found: " + pageId);
+  }
+}
+
+// 1. Jab Logout button click ho (Sirf modal dikhao)
+function logout() {
+  const modal = document.getElementById("logoutModal");
+  modal.classList.remove("hidden");
+}
+
+// 2. Agar user Cancel kare
+function closeLogoutModal() {
+  document.getElementById("logoutModal").classList.add("hidden");
+}
+
+// 3. Agar user 'Yes, Logout' par click kare (Asli Logout logic)
+function confirmLogout() {
+  // Modal chhupao
+  closeLogoutModal();
+
+  // Header Buttons Reset
+  const loginNav = document.getElementById("loginNavBtn");
+  const logoutNav = document.getElementById("logoutNavBtn");
+  if(loginNav) loginNav.classList.remove("hidden");
+  if(logoutNav) logoutNav.classList.add("hidden");
+  
+  // Inputs clear karo
+  const emailInput = document.getElementById("loginEmail");
+  if(emailInput) emailInput.value = "";
+  
+  // Landing Page par bhejo
+  showPage("landing-page");
+  
+  console.log("Custom logout successful.");
+}
+
+function updateStickyCTA() {
+
+  const landing = document.getElementById("landing-page");
+  const cta = document.getElementById("stickyCTA");
+
+  if (!cta) return;
+
+  if (!landing.classList.contains("hidden")) {
+    cta.style.display = "block";
+  } else {
+    cta.style.display = "none";
+  }
+}
+
+function startDownloadProcess() {
+  const btn = document.getElementById("downloadBtn");
+  
+  // 1. Visual Feedback
+  btn.innerText = "⏳ E-Book Downloading...";
+  btn.disabled = true;
+
+  // 2. 🔥 Sabse Stable Download Link (Bade files ke liye)
+  // Isse Google Drive ka preview page khulega jahan se 100% download hoga
+  const fileId = "14qrXGhCMvb8yAOXchXDtusQ0EpbVN1Q5";
+  const downloadUrl = "https://drive.google.com/uc?id=" + fileId + "&export=download";
+  
+  // Naya Tab khol kar download start karein taaki main page na ruke
+  window.open(downloadUrl, '_blank');
+
+  // 3. Reset Button after 5 seconds
+  setTimeout(() => {
+    btn.innerText = "📥 Download E-Book (PDF)";
+    btn.disabled = false;
+  }, 5000);
+}
+
+// Is function ko apne scripts.html mein add karein
+async function startDownload() {
+  const btn = document.getElementById("downloadBtn");
+  const msg = document.getElementById("downloadMsg");
+  
+  // Pehle global variable check karein, agar khali ho toh input se le
+  let email = currentUserEmail; 
+  
+  if (!email) {
+    const loginEmailInput = document.getElementById("loginEmail");
+    const checkoutEmailInput = document.querySelector('#checkout-page input[type="email"]');
+    email = (loginEmailInput && loginEmailInput.value.trim()) || 
+            (checkoutEmailInput && checkoutEmailInput.value.trim());
+  }
+
+  if (!email) {
+    if(msg) msg.innerText = "Error: Email not found. Please log in again. ❌";
+    return;
+  }
+
+  btn.innerText = "⏳ E-Book Downloading...";
+  btn.disabled = true;
+  if(msg) msg.innerText = "Connecting to secure server...";
+
+  try {
+    const response = await fetch(`${BACKEND_URL}?action=getLink&email=${encodeURIComponent(email)}`);
+    const res = await response.json();
+
+    if (res.success && res.link) {
+      // 🔥 SILENT DOWNLOAD LOGIC START
+      const a = document.createElement("a");
+      a.href = res.link;
+      a.setAttribute("download", "Mission_1_Crore_Ebook.pdf"); 
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      // 🔥 SILENT DOWNLOAD LOGIC END
+
+      if(msg) msg.innerText = "Download started successfully! ✅";
+    } else {
+      if(msg) msg.innerText = "Access Denied: Please use your paid email. ❌";
+    }
+  } catch (err) {
+    console.error("Download Error:", err);
+    if(msg) msg.innerText = "Server error. Please try again.";
+  }
+
+  setTimeout(() => {
+    btn.innerText = "📥 Download E-Book (PDF)";
+    btn.disabled = false;
+  }, 5000);  
+}
+
+function openLogin() {
+  console.log("Login button clicked!"); 
+
+  // 1. બધા પેજ હાઈડ કરો
+  const allPages = document.querySelectorAll(".page");
+  allPages.forEach(p => {
+    p.classList.add("hidden");
+    p.classList.remove("active", "fade-up");
+  });
+
+  // 2. લોગિન પેજ શોધો અને બતાવો
+  const lp = document.getElementById("login-page");
+  if (lp) {
+    lp.classList.remove("hidden");
+    lp.classList.add("active");
+    void lp.offsetWidth; // Animation trigger
+    lp.classList.add("fade-up");
+    console.log("Login page is now active");
+  } else {
+    console.error("Error: login-page ID missing in HTML!");
+  }
+
+  if(typeof updateStickyCTA === "function") updateStickyCTA();
+  window.scrollTo(0, 0);
+}
+
+document.addEventListener("DOMContentLoaded", updateStickyCTA);
+
+// 1. Apna Apps Script URL yahan dalein
